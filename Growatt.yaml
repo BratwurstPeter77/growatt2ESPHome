@@ -1,0 +1,185 @@
+esphome:
+  name: wechselrichter-growatt
+  friendly_name: Wechselrichter Growatt
+
+esp8266:
+  board: d1_mini
+
+logger:
+  # Wichtig bei Modbus auf ESP8266: serielles Logging aus, damit UART frei ist.
+  baud_rate: 0
+  level: INFO
+
+api:
+  encryption:
+    key: 
+
+ota:
+  - platform: esphome
+    password: 
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Wechselrichter-Growatt"
+    password: "RJ1ZNqe6DxqV"
+
+captive_portal:
+
+uart:
+  id: mod_uart
+  # deine Verdrahtung: D6=TX / D5=RX
+  tx_pin: GPIO12   # D6
+  rx_pin: GPIO14   # D5
+  baud_rate: 9600
+  stop_bits: 1
+
+modbus:
+  id: modbus1
+  uart_id: mod_uart
+
+modbus_controller:
+  - id: growatt_wr1
+    address: 0x01
+    modbus_id: modbus1
+    update_interval: 10s
+
+  - id: growatt_wr2
+    address: 0x02
+    modbus_id: modbus1
+    update_interval: 10s
+
+sensor:
+  # ================= WR1 =================
+  # PV1 Power: Input Registers 5+6 (0.1W) -> U_DWORD ab 5
+  - platform: modbus_controller
+    modbus_controller_id: growatt_wr1
+    name: "WR1 PV1 Power"
+    id: wr1_pv1_power
+    address: 5
+    register_type: read
+    value_type: U_DWORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # PV1 Energy Today: Input Registers 59+60 (0.1kWh) -> U_DWORD ab 59
+  - platform: modbus_controller
+    modbus_controller_id: growatt_wr1
+    name: "WR1 PV1 Energy Today"
+    address: 59
+    register_type: read
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # PV1 Energy Total: Input Registers 61+62 (0.1kWh) -> U_DWORD ab 61
+  - platform: modbus_controller
+    modbus_controller_id: growatt_wr1
+    name: "WR1 PV1 Energy Total"
+    address: 61
+    register_type: read
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # IPM Temperatur: Input Register 94 (0.1°C) -> /10
+  - platform: modbus_controller
+    modbus_controller_id: growatt_wr1
+    name: "WR1 IPM Temperature"
+    address: 94
+    register_type: read
+    value_type: U_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # ================= WR2 =================
+  - platform: modbus_controller
+    modbus_controller_id: growatt_wr2
+    name: "WR2 PV1 Power"
+    id: wr2_pv1_power
+    address: 5
+    register_type: read
+    value_type: U_DWORD
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: growatt_wr2
+    name: "WR2 PV1 Energy Today"
+    address: 59
+    register_type: read
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: growatt_wr2
+    name: "WR2 PV1 Energy Total"
+    address: 61
+    register_type: read
+    value_type: U_DWORD
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  - platform: modbus_controller
+    modbus_controller_id: growatt_wr2
+    name: "WR2 IPM Temperature"
+    address: 94
+    register_type: read
+    value_type: U_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.1
+
+  # ================= SUMME =================
+  - platform: template
+    name: "PV1 Power Total"
+    unit_of_measurement: "W"
+    device_class: power
+    state_class: measurement
+    accuracy_decimals: 1
+    lambda: |-
+      return id(wr1_pv1_power).state + id(wr2_pv1_power).state;
+    update_interval: 10s
+
+  # ================= DIAGNOSE (optional) =================
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "Uptime"
+    update_interval: 60s
+
